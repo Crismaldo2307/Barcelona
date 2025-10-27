@@ -1,46 +1,70 @@
-import Hero from './components/Hero.jsx';
-import DataAnalysis from './components/DataAnalysis.jsx';
-import AboutProject from './components/AboutProject.jsx';
-import FormularioContacto from './components/FormularioContacto.jsx';
-import Footer from './components/Footer.jsx';
-import ChatIA from './components/ChatIA.jsx';
+import { useEffect, useMemo, useState } from 'react';
+import Layout from './components/Layout.jsx';
+import Busqueda from './pages/Busqueda.jsx';
+import Home from './pages/Home.jsx';
+import Nosotros from './pages/Nosotros.jsx';
+import Politica from './pages/Politica.jsx';
 
-const App = () => (
-  <div className="flex min-h-screen flex-col bg-sand/40">
-    <header className="sticky top-0 z-40 bg-white/80 shadow-sm backdrop-blur">
-      <div className="container mx-auto flex items-center justify-between px-6 py-4 md:px-12">
-        <a href="#inicio" className="text-lg font-semibold text-midnight">
-          renta-turismo-bcn
-        </a>
-        <nav className="hidden gap-6 text-sm font-medium text-midnight md:flex">
-          <a href="#datos">Datos</a>
-          <a href="#sobre">Sobre el proyecto</a>
-          <a href="#contacto">Contacto</a>
-        </nav>
-      </div>
-    </header>
+const routes = {
+  '/': Home,
+  '/busqueda': Busqueda,
+  '/nosotros': Nosotros,
+  '/politica': Politica
+};
 
-    <main className="flex-1">
-      <Hero />
-      <DataAnalysis />
-      <AboutProject />
-      <FormularioContacto />
-    </main>
+const normalizeRoute = (hash) => {
+  if (!hash || hash === '#') return '/';
+  const path = hash.startsWith('#') ? hash.slice(1) : hash;
+  if (!path) return '/';
+  return path.startsWith('/') ? path : `/${path}`;
+};
 
-    <section id="privacidad" className="container mx-auto px-6 pb-24 md:px-12">
-      <div className="rounded-3xl bg-white/80 p-6 text-xs text-slate-500 shadow-inner">
-        <h3 className="mb-2 text-base font-semibold text-midnight">Política de privacidad</h3>
-        <p>
-          Este sitio utiliza formularios y analítica básica para mejorar el servicio. Los datos recopilados no se ceden a
-          terceros y puedes solicitar su eliminación escribiendo a
-          <a href="mailto:privacidad@data-commons.barcelona" className="ml-1 underline">privacidad@data-commons.barcelona</a>.
-        </p>
-      </div>
-    </section>
+const App = () => {
+  const [currentRoute, setCurrentRoute] = useState(() => normalizeRoute(window.location.hash));
+  const [pendingAnchor, setPendingAnchor] = useState(null);
 
-    <Footer />
-    <ChatIA />
-  </div>
-);
+  useEffect(() => {
+    const handleHashChange = () => {
+      const normalized = normalizeRoute(window.location.hash);
+      const [path, anchor] = normalized.split('#');
+      setCurrentRoute(path);
+      if (anchor) {
+        setPendingAnchor(anchor);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (pendingAnchor) {
+      const element = document.getElementById(pendingAnchor);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      setPendingAnchor(null);
+    }
+  }, [pendingAnchor, currentRoute]);
+
+  const navigate = (path, options = {}) => {
+    const anchor = options.anchor ? `#${options.anchor}` : '';
+    const targetPath = path.startsWith('/') ? path : `/${path}`;
+    if (options.anchor) {
+      setPendingAnchor(options.anchor);
+    }
+    window.location.hash = `${targetPath}${anchor}`;
+    if (!anchor) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const CurrentPage = useMemo(() => routes[currentRoute] || Home, [currentRoute]);
+
+  return (
+    <Layout currentRoute={currentRoute} onNavigate={navigate}>
+      <CurrentPage onNavigate={navigate} />
+    </Layout>
+  );
+};
 
 export default App;

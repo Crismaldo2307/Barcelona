@@ -1,131 +1,186 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const initialMessages = [
   {
     role: 'assistant',
-    content:
-      'Hola, soy la analista virtual del proyecto. Pregunta sobre turismo, regulación o cómo afecta al alquiler y te responderé con insights.'
+    content: '¡Hola! Soy el asistente IA de Cristian y Alonso Data. ¿En qué puedo ayudarte?'
   }
 ];
+
+const knowledgeBase = [
+  {
+    category: 'saludo',
+    keywords: ['hola', 'buenas', 'saludos', 'hey'],
+    response:
+      '¡Hola! Estamos analizando cómo ha evolucionado el alquiler en Barcelona entre 2014 y 2025. Pregúntame sobre renta, turismo, comercio o privacidad de datos.'
+  },
+  {
+    category: 'renta/alquiler',
+    keywords: ['renta', 'alquiler', 'precio', 'mensual', 'vivienda'],
+    response:
+      'El alquiler medio pasó de 860 € en 2014 a casi 1.500 € en 2025. La escalada refleja una fuerte demanda y la conversión de vivienda a usos turísticos. Puedes explorar el gráfico de línea para ver los hitos anuales.'
+  },
+  {
+    category: 'turismo',
+    keywords: ['turismo', 'visitantes', 'turistas', 'hotel', 'airbnb'],
+    response:
+      'Barcelona recibió 8,5 millones de turistas en 2014 y supera los 11 millones en 2025. Los picos turísticos incrementan los ingresos potenciales de los propietarios y presionan las rentas. Observa el gráfico combinado de turismo y comercio para más detalles.'
+  },
+  {
+    category: 'comercio',
+    keywords: ['comercio', 'tiendas', 'restauración', 'consumo', 'gasto'],
+    response:
+      'El índice de comercios orientados a turismo creció 39 puntos desde 2014. Nuevas licencias de restauración y retail experiencial atraen gasto, refuerzan la demanda de alojamientos y elevan los precios en zonas centrales.'
+  },
+  {
+    category: 'correlación',
+    keywords: ['correlacion', 'correlación', 'relacion', 'relación', 'impacto'],
+    response:
+      'La correlación turismo-renta se visualiza en el gráfico de dispersión: los puntos con mayor intensidad comercial se ubican donde las rentas son más altas. Esto evidencia que más visitantes y gasto suelen ir de la mano de alquileres elevados.'
+  },
+  {
+    category: 'bigquery/proceso',
+    keywords: ['bigquery', 'etl', 'proceso', 'limpieza', 'pipeline'],
+    response:
+      'El flujo de preparación se ejecuta en BigQuery: ingestamos registros municipales, normalizamos series temporales y generamos tablas agregadas para Looker Studio. Consulta la página Búsqueda para ver el iframe “Proceso requerido en BigQuery”.'
+  },
+  {
+    category: 'contacto',
+    keywords: ['contacto', 'correo', 'email', 'formulario', 'hablar'],
+    response:
+      'Puedes escribirnos a cmaldonadoa@student.eae.es o completar el formulario al final de la página principal. Recibirás respuesta en menos de 48 horas.'
+  },
+  {
+    category: 'looker studio',
+    keywords: ['looker', 'studio', 'dashboard', 'iframe'],
+    response:
+      'Disponemos de dos dashboards en Looker Studio: uno con la evolución del precio de la renta y otro con el flujo en BigQuery. En la sección Búsqueda encontrarás ambos iframes listos para explorar.'
+  },
+  {
+    category: 'mapa',
+    keywords: ['mapa', 'inmigrantes', 'distrito', 'geografia', 'geografía'],
+    response:
+      'El mapa integrado muestra inmigrantes y renta promedio por distrito. Usa los filtros laterales para comparar zonas como Ciutat Vella, Eixample o Sant Martí y ver cómo cambian los precios.'
+  },
+  {
+    category: 'gráficos',
+    keywords: ['grafico', 'gráfico', 'visualización', 'charts', 'datos'],
+    response:
+      'Contamos con gráficos interactivos de líneas, barras y correlación construidos con Recharts. Pasa el cursor sobre los puntos para ver valores exactos y descubre cómo evoluciona cada indicador.'
+  },
+  {
+    category: 'privacidad',
+    keywords: ['privacidad', 'datos', 'cookies', 'tratamiento'],
+    response:
+      'Tratamos los datos bajo la Política de Datos publicada en la web. Solo usamos la información de contacto para responder a tus solicitudes y puedes escribir a cmaldonadoa@student.eae.es para ejercer tus derechos.'
+  }
+];
+
+const fallbackResponse =
+  'No tengo una respuesta directa para eso, pero puedo ayudarte con temas de alquiler, turismo, comercio, BigQuery, dashboards o privacidad. ¿Sobre cuál te gustaría saber más?';
+
+const normalizeText = (text) => text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
 
 const ChatIA = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
+  const chatRef = useRef(null);
 
-  const toggleChat = () => setIsOpen((prev) => !prev);
+  useEffect(() => {
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
+  }, [messages, isOpen]);
 
-  const handleSend = async (event) => {
+  const handleSend = (event) => {
     event.preventDefault();
     if (!input.trim()) return;
 
     const userMessage = { role: 'user', content: input.trim() };
-    setMessages((prev) => [...prev, userMessage]);
+    const normalized = normalizeText(input);
+
+    const match = knowledgeBase.find((entry) =>
+      entry.keywords.some((keyword) => normalized.includes(normalizeText(keyword)))
+    );
+
+    const assistantMessage = {
+      role: 'assistant',
+      content: match ? match.response : fallbackResponse
+    };
+
+    setMessages((prev) => [...prev, userMessage, assistantMessage]);
     setInput('');
-    setLoading(true);
-
-    try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_OPENAI_API_KEY || 'TU_API_KEY_AQUI'}`
-        },
-        body: JSON.stringify({
-          model: import.meta.env.VITE_OPENAI_MODEL || 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content:
-                'Eres una analista urbana que explica con datos cómo el turismo afecta a las rentas en Barcelona. Usa un tono cercano y profesional.'
-            },
-            ...messages,
-            userMessage
-          ],
-          temperature: 0.4,
-          max_tokens: 280
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('No se pudo conectar con el servicio de IA.');
-      }
-
-      const data = await response.json();
-      const assistantReply =
-        data?.choices?.[0]?.message?.content ||
-        'No pude obtener datos en este momento, pero puedo ayudarte a interpretar los gráficos disponibles.';
-
-      setMessages((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
-    } catch (error) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content:
-            'No he podido conectar con la API de OpenAI. Revisa tu clave en VITE_OPENAI_API_KEY y vuelve a intentarlo. Mientras tanto, consulta la sección de datos para más contexto.'
-        }
-      ]);
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
       <button
-        onClick={toggleChat}
-        className="flex items-center gap-2 rounded-full bg-mediterranean px-5 py-3 font-semibold text-white shadow-lg shadow-mediterranean/40 transition hover:scale-105"
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex items-center gap-2 rounded-full bg-tealnight px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-olive/60"
       >
-        <span>{isOpen ? 'Cerrar chat' : 'Habla con la IA'}</span>
+        {isOpen ? 'Cerrar asistente' : 'Chat IA'}
       </button>
-
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3 }}
-            className="mt-4 w-80 rounded-3xl bg-white p-4 shadow-2xl"
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ duration: 0.25 }}
+            className="mt-3 w-80 rounded-3xl bg-white/95 p-4 shadow-soft backdrop-blur"
           >
             <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-midnight">Chat inteligente</h4>
-              <button onClick={toggleChat} className="text-sm text-slate-500 hover:text-midnight">
+              <div>
+                <p className="text-sm font-semibold text-charcoal">Asistente IA</p>
+                <p className="text-xs text-charcoal/70">Cristhyan y Alonso Data</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="text-lg font-semibold text-charcoal/70 transition hover:text-olive"
+                aria-label="Cerrar chat"
+              >
                 ×
               </button>
             </div>
-            <div className="mt-3 h-72 space-y-3 overflow-y-auto pr-2 text-sm">
+            <div
+              ref={chatRef}
+              className="mt-4 h-72 space-y-3 overflow-y-auto pr-2 text-sm"
+              aria-live="polite"
+            >
               {messages.map((message, index) => (
                 <div
-                  key={index}
-                  className={`rounded-2xl px-4 py-3 shadow-sm ${
+                  key={`message-${index}`}
+                  className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm shadow ${
                     message.role === 'assistant'
-                      ? 'bg-mediterranean/10 text-midnight'
-                      : 'ml-auto bg-mediterranean text-white'
+                      ? 'bg-beige/80 text-charcoal'
+                      : 'ml-auto bg-olive text-white'
                   }`}
                 >
                   {message.content}
                 </div>
               ))}
-              {loading && <p className="text-center text-xs text-slate-400">Pensando...</p>}
             </div>
             <form onSubmit={handleSend} className="mt-3 space-y-2">
+              <label htmlFor="chat-message" className="sr-only">
+                Escribe tu mensaje para el asistente IA
+              </label>
               <textarea
+                id="chat-message"
                 rows={2}
-                className="w-full resize-none rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:border-mediterranean focus:ring-mediterranean"
-                placeholder="¿Cómo afecta Airbnb en Ciutat Vella?"
+                className="w-full resize-none rounded-2xl border border-cloud/70 px-3 py-2 text-sm focus:border-olive focus:ring-olive"
+                placeholder="Pregúntame sobre turismo o renta"
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-              />
+              ></textarea>
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full rounded-full bg-midnight px-4 py-2 text-sm font-semibold text-white transition hover:bg-mediterranean disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-full bg-tealnight px-4 py-2 text-sm font-semibold text-white transition hover:bg-olive"
               >
-                {loading ? 'Enviando…' : 'Enviar'}
+                Enviar
               </button>
             </form>
           </motion.div>
